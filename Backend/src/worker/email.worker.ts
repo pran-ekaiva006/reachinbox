@@ -3,6 +3,7 @@ import { redisConnection } from "../queue/redis";
 import { prisma } from "../db";
 import { canSendEmailGlobal, canSendEmailForSender } from "../queue/rateLimit";
 import { emailQueue } from "../queue/email.queue";
+import { deadQueue } from "../queue/dead.queue";
 import nodemailer from "nodemailer";
 
 const transporterPromise = nodemailer.createTestAccount().then(acc =>
@@ -32,15 +33,14 @@ export const emailWorker = new Worker(
       return;
     }
 
-    // Global limit
-    const allowedGlobal = await canSendEmailGlobal();
-    if (!allowedGlobal) throw new Error("Global hourly email limit exceeded");
+    // Rate limits
+    if (!(await canSendEmailGlobal()))
+      throw new Error("Global hourly email limit exceeded");
 
-    // Per-sender limit
-    const allowedSender = await canSendEmailForSender(email.senderId);
-    if (!allowedSender) throw new Error("Sender hourly email limit exceeded");
+    if (!(await canSendEmailForSender(email.senderId)))
+      throw new Error("Sender hourly email limit exceeded");
 
-    // Throttle between sends
+    // Throttle
     const minDelay = Number(process.env.MIN_DELAY_MS || 2000);
     await new Promise(r => setTimeout(r, minDelay));
 
@@ -49,20 +49,34 @@ export const emailWorker = new Worker(
       data: { status: "sending" },
     });
 
-    const transporter = await transporterPromise;
-    const info = await transporter.sendMail({
-      from: "ReachInbox <no-reply@reachinbox.test>",
-      to: email.toEmail,
-      subject: email.subject,
-      text: email.body,
-    });
+    try {
+      const transporter = await transporterPromise;
+      const info = await transporter.sendMail({
+        from: "ReachInbox <no-reply@reachinbox.test>",
+        to: email.toEmail,
+        subject: email.subject,
+        text: email.body,
+      });
 
-    await prisma.email.update({
-      where: { id: emailId },
-      data: { status: "sent", sentAt: new Date() },
-    });
+      await prisma.email.update({
+        where: { id: emailId },
+        data: { status: "sent", sentAt: new Date() },
+      });
 
-    console.log("Preview:", nodemailer.getTestMessageUrl(info));
+      console.log("Preview:", nodemailer.getTestMessageUrl(info));
+    } catch (err) {
+      await prisma.email.update({
+        where: { id: emailId },
+        data: { status: "failed" },
+      });
+
+      await deadQueue.add("dead", {
+        emailId,
+        reason: String(err),
+      });
+
+      throw err; // let BullMQ retry
+    }
   },
   {
     connection: redisConnection,
