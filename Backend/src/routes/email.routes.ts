@@ -21,6 +21,17 @@ router.post("/schedule", async (req, res) => {
       return res.status(400).json({ error: "idempotencyKey required" });
     }
 
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(400).json({ error: "Invalid userId" });
+
+    const sender = await prisma.sender.findUnique({ where: { id: senderId } });
+    if (!sender) return res.status(400).json({ error: "Invalid senderId" });
+
+    const date = new Date(scheduledAt);
+    if (isNaN(date.getTime())) {
+      return res.status(400).json({ error: "Invalid scheduledAt" });
+    }
+
     const email = await prisma.email.create({
       data: {
         userId,
@@ -28,19 +39,28 @@ router.post("/schedule", async (req, res) => {
         toEmail,
         subject,
         body,
-        scheduledAt: new Date(scheduledAt),
+        scheduledAt: date,
         status: "scheduled",
         idempotencyKey,
       },
     });
 
-    await emailQueue.add("send-email", { emailId: email.id });
+   const delay = date.getTime() - Date.now();
+
+await emailQueue.add(
+  "send-email",
+  { emailId: email.id },
+  {
+    delay: Math.max(delay, 0),
+  }
+);
 
     return res.json(email);
   } catch (err) {
-    console.error(err);
+    console.error("Schedule error:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 export default router;
