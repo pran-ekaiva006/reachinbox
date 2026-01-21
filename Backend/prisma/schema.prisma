@@ -29,9 +29,14 @@ model Sender {
 }
 
 model Email {
-  id             String    @id @default(uuid())
-  userId         String
-  senderId       String
+  id       String @id @default(uuid())
+  userId   String
+  senderId String
+
+  user   User      @relation(fields: [userId], references: [id])
+  sender Sender    @relation(fields: [senderId], references: [id])
+  job    EmailJob?
+
   toEmail        String
   subject        String
   body           String
@@ -39,11 +44,11 @@ model Email {
   sentAt         DateTime?
   status         String
   idempotencyKey String    @unique
-  createdAt      DateTime  @default(now())
 
-  user   User      @relation(fields: [userId], references: [id])
-  sender Sender    @relation(fields: [senderId], references: [id])
-  job    EmailJob?
+  retryCount Int     @default(0)
+  lastError  String?
+
+  createdAt DateTime @default(now())
 }
 
 model EmailJob {

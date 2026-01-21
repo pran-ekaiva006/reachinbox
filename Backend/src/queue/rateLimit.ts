@@ -1,24 +1,28 @@
-import { redis } from "./redis";
+import { redisConnection } from "./redis";
+import IORedis from "ioredis";
 
-const GLOBAL_KEY = "email:global:hour";
-const SENDER_KEY = (senderId: string) => `email:sender:${senderId}:hour`;
+const redis = new IORedis(redisConnection.url!);
 
-const GLOBAL_LIMIT = Number(process.env.MAX_EMAILS_PER_HOUR || 2);
-const SENDER_LIMIT = Number(process.env.MAX_EMAILS_PER_HOUR_PER_SENDER || 1);
+// Global hourly limit
+export async function canSendEmailGlobal(): Promise<boolean> {
+  const hour = new Date().toISOString().slice(0, 13);
+  const key = `email_global:${hour}`;
+  const count = await redis.incr(key);
 
-export async function canSendEmail(): Promise<boolean> {
-  const count = await redis.incr(GLOBAL_KEY);
-  if (count === 1) {
-    await redis.expire(GLOBAL_KEY, 3600);
-  }
-  return count <= GLOBAL_LIMIT;
+  if (count === 1) await redis.expire(key, 3600);
+
+  const max = Number(process.env.MAX_EMAILS_PER_HOUR_GLOBAL || 500);
+  return count <= max;
 }
 
+// Per-sender hourly limit
 export async function canSendEmailForSender(senderId: string): Promise<boolean> {
-  const key = SENDER_KEY(senderId);
+  const hour = new Date().toISOString().slice(0, 13);
+  const key = `email_sender:${senderId}:${hour}`;
   const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, 3600);
-  }
-  return count <= SENDER_LIMIT;
+
+  if (count === 1) await redis.expire(key, 3600);
+
+  const max = Number(process.env.MAX_EMAILS_PER_HOUR_PER_SENDER || 50);
+  return count <= max;
 }

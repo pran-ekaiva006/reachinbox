@@ -1,8 +1,8 @@
 import { Worker } from "bullmq";
 import { redisConnection } from "../queue/redis";
 import { prisma } from "../db";
-import { canSendEmailForSender } from "../queue/rateLimit";
-
+import { canSendEmailGlobal, canSendEmailForSender } from "../queue/rateLimit";
+import { emailQueue } from "../queue/email.queue";
 import nodemailer from "nodemailer";
 
 const transporterPromise = nodemailer.createTestAccount().then(acc =>
@@ -22,17 +22,23 @@ export const emailWorker = new Worker(
     const email = await prisma.email.findUnique({ where: { id: emailId } });
     if (!email || email.status !== "scheduled") return;
 
-    // Global hourly limit
-    const allowedGlobal = await canSendEmailForSender(email.senderId);
-    if (!allowedGlobal) {
-      throw new Error("Global hourly email limit exceeded");
+    // Respect scheduled time
+    if (email.scheduledAt > new Date()) {
+      await emailQueue.add(
+        "send-email",
+        { emailId },
+        { delay: email.scheduledAt.getTime() - Date.now() }
+      );
+      return;
     }
 
-    // Per-sender hourly limit
+    // Global limit
+    const allowedGlobal = await canSendEmailGlobal();
+    if (!allowedGlobal) throw new Error("Global hourly email limit exceeded");
+
+    // Per-sender limit
     const allowedSender = await canSendEmailForSender(email.senderId);
-    if (!allowedSender) {
-      throw new Error("Sender hourly email limit exceeded");
-    }
+    if (!allowedSender) throw new Error("Sender hourly email limit exceeded");
 
     // Throttle between sends
     const minDelay = Number(process.env.MIN_DELAY_MS || 2000);
