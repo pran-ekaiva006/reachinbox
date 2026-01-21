@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db";
 import { emailQueue } from "../queue/email.queue";
 
+
 const router = Router();
 
 router.post("/schedule", async (req, res) => {
