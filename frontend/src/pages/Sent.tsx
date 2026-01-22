@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api/client";
 
 type Email = {
@@ -13,45 +13,29 @@ export default function Sent() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const mounted = useRef(true);
-
-  const fetchEmails = async (initial = false) => {
-    if (initial) setLoading(true);
-
-    try {
-      const res = await api.get<Email[]>("/emails/sent");
-      if (mounted.current) {
-        setEmails(res.data);
-        setError(null);
-      }
-    } catch {
-      if (mounted.current) {
-        setError("Failed to load sent emails");
-      }
-    } finally {
-      if (initial && mounted.current) {
-        setLoading(false);
-      }
-    }
-  };
 
   useEffect(() => {
-    fetchEmails(true);
-    const interval = setInterval(() => fetchEmails(false), 5000);
+    let cancelled = false;
+
+    api
+      .get<Email[]>("/emails/sent")
+      .then(res => {
+        if (!cancelled) setEmails(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Failed to load sent emails");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
     return () => {
-      mounted.current = false;
-      clearInterval(interval);
+      cancelled = true;
     };
   }, []);
 
-  if (loading) {
-    return <p className="text-sm text-gray-500">Loading sent emails…</p>;
-  }
-
-  if (error) {
-    return <p className="text-sm text-red-600">{error}</p>;
-  }
+  if (loading) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (error) return <p className="text-sm text-red-600">{error}</p>;
 
   return (
     <div className="space-y-4">
@@ -63,34 +47,24 @@ export default function Sent() {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border bg-white">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left font-medium">To</th>
-                <th className="px-4 py-3 text-left font-medium">Subject</th>
-                <th className="px-4 py-3 text-left font-medium">Sent Time</th>
-                <th className="px-4 py-3 text-left font-medium">Status</th>
+                <th className="px-4 py-3 text-left">To</th>
+                <th className="px-4 py-3 text-left">Subject</th>
+                <th className="px-4 py-3 text-left">Sent At</th>
+                <th className="px-4 py-3 text-left">Status</th>
               </tr>
             </thead>
             <tbody>
-              {emails.map(email => (
-                <tr key={email.id} className="border-t">
-                  <td className="px-4 py-3">{email.toEmail}</td>
-                  <td className="px-4 py-3">{email.subject}</td>
+              {emails.map(e => (
+                <tr key={e.id} className="border-t">
+                  <td className="px-4 py-3">{e.toEmail}</td>
+                  <td className="px-4 py-3">{e.subject}</td>
                   <td className="px-4 py-3">
-                    {new Date(email.sentAt).toLocaleString()}
+                    {new Date(e.sentAt).toLocaleString()}
                   </td>
-                  <td className="px-4 py-3 capitalize">
-                    <span
-                      className={
-                        email.status === "sent"
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }
-                    >
-                      {email.status}
-                    </span>
-                  </td>
+                  <td className="px-4 py-3 text-green-600">{e.status}</td>
                 </tr>
               ))}
             </tbody>

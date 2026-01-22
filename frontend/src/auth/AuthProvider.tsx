@@ -1,43 +1,41 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import {
   GoogleAuthProvider,
-  signInWithPopup,
-  signOut,
+  signInWithRedirect,
+  getRedirectResult,
   onAuthStateChanged,
+  signOut,
 } from "firebase/auth";
 import type { User } from "firebase/auth";
 import { auth } from "../firebase";
 
-type AuthContextType = {
+export type AuthContextType = {
   user: User | null;
   loading: boolean;
-  login: () => Promise<void>;
+  login: () => void;
   logout: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, currentUser => {
+    getRedirectResult(auth).catch(() => {});
+
+    const unsub = onAuthStateChanged(auth, currentUser => {
       setUser(currentUser);
       setLoading(false);
     });
-    return unsubscribe;
+
+    return unsub;
   }, []);
 
-  const login = async () => {
+  const login = () => {
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    signInWithRedirect(auth, provider);
   };
 
   const logout = async () => {
@@ -51,10 +49,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/* ✅ THIS WAS MISSING */
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuth must be used inside AuthProvider");
   }
-  return context;
+  return ctx;
 }

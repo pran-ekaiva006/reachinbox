@@ -1,42 +1,45 @@
-import { useState } from "react";
 import { useAuth } from "../auth/AuthProvider";
+import "../styles/login.css";
 
 export default function Login() {
-  const { login } = useAuth();
-  const [loading, setLoading] = useState(false);
-
-  const handleLogin = async () => {
-    try {
-      setLoading(true);
-      await login();
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { login, loading } = useAuth();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border bg-white p-8 shadow-sm">
-        {/* Brand */}
-        <h1 className="text-2xl font-semibold text-center mb-2">
-          ReachInbox
-        </h1>
-        <p className="text-sm text-gray-500 text-center mb-6">
-          Sign in to manage scheduled and sent emails
+    <div className="login-page">
+      <div className="login-card">
+        <h1 className="login-title">ReachInbox</h1>
+        <p className="login-subtitle">
+          Sign in to manage and schedule your email campaigns
         </p>
 
-        {/* Login Button */}
         <button
-          onClick={handleLogin}
+          className="google-btn"
+          onClick={login}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-3 rounded-md bg-black py-3 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60"
         >
-          {loading ? "Signing in…" : "Continue with Google"}
+          <img
+            src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+            alt="Google"
+            width="18"
+            height="18"
+          />
+          Continue with Google
         </button>
 
-        {/* Footer hint */}
-        <p className="mt-6 text-xs text-gray-400 text-center">
-          Secure Google authentication
+        <button
+          className="signup-btn"
+          onClick={login}
+          disabled={loading}
+        >
+          Create a new account
+        </button>
+
+        {loading && (
+          <p className="login-footer">Signing you in…</p>
+        )}
+
+        <p className="login-footer">
+          By continuing, you agree to our Terms & Privacy Policy.
         </p>
       </div>
     </div>
