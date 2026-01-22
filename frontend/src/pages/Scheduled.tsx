@@ -15,11 +15,17 @@ export default function Scheduled() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api
-      .get("/emails/scheduled")
-      .then(res => setEmails(res.data))
-      .catch(() => setError("Failed to load scheduled emails"))
-      .finally(() => setLoading(false));
+    const fetchData = () => {
+      api
+        .get("/emails/scheduled")
+        .then(res => setEmails(res.data))
+        .catch(() => setError("Failed to load scheduled emails"))
+        .finally(() => setLoading(false));
+    };
+
+    fetchData();
+    const id = setInterval(fetchData, 5000);
+    return () => clearInterval(id);
   }, []);
 
   if (loading) return <p>Loading scheduled emails…</p>;
@@ -32,14 +38,26 @@ export default function Scheduled() {
       {emails.length === 0 ? (
         <p>No scheduled emails</p>
       ) : (
-        <ul>
-          {emails.map(e => (
-            <li key={e.id}>
-              <strong>{e.toEmail}</strong> — {e.subject} —{" "}
-              {new Date(e.scheduledAt).toLocaleString()}
-            </li>
-          ))}
-        </ul>
+        <table>
+          <thead>
+            <tr>
+              <th>To</th>
+              <th>Subject</th>
+              <th>Scheduled At</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {emails.map(e => (
+              <tr key={e.id}>
+                <td>{e.toEmail}</td>
+                <td>{e.subject}</td>
+                <td>{new Date(e.scheduledAt).toLocaleString()}</td>
+                <td>{e.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );
