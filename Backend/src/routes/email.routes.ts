@@ -51,14 +51,46 @@ await emailQueue.add(
   "send-email",
   { emailId: email.id },
   {
-    delay: Math.max(delay, 0),
+    attempts: 5,
+    backoff: { type: "exponential", delay: 5000 },
+    removeOnComplete: true,
+    removeOnFail: false,
   }
 );
+
 
     return res.json(email);
   } catch (err) {
     console.error("Schedule error:", err);
     return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET scheduled emails
+router.get("/scheduled", async (_req, res) => {
+  try {
+    const emails = await prisma.email.findMany({
+      where: { status: "scheduled" },
+      orderBy: { scheduledAt: "asc" },
+    });
+    res.json(emails);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch scheduled emails" });
+  }
+});
+
+// GET sent emails
+router.get("/sent", async (_req, res) => {
+  try {
+    const emails = await prisma.email.findMany({
+      where: { status: "sent" },
+      orderBy: { sentAt: "desc" },
+    });
+    res.json(emails);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch sent emails" });
   }
 });
 
