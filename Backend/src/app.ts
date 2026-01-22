@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import emailRoutes from "./routes/email.routes";
+import emailRoutes from "./routes/email.routes.js";
 
 export const app = express();
 
@@ -12,4 +12,3 @@ app.use("/emails", emailRoutes);
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
-

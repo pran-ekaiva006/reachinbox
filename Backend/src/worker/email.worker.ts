@@ -1,10 +1,11 @@
 import { Worker } from "bullmq";
-import { redisConnection } from "../queue/redis";
-import { prisma } from "../db";
-import { canSendEmailGlobal, canSendEmailForSender } from "../queue/rateLimit";
-import { emailQueue } from "../queue/email.queue";
-import { deadQueue } from "../queue/dead.queue";
+import { redisConnection } from "../queue/redis.js";
+import { prisma } from "../db.js";
+import { canSendEmailGlobal, canSendEmailForSender } from "../queue/rateLimit.js";
+import { emailQueue } from "../queue/email.queue.js";
+import { deadQueue } from "../queue/dead.queue.js";
 import nodemailer from "nodemailer";
+
 
 const transporterPromise = nodemailer.createTestAccount().then(acc =>
   nodemailer.createTransport({

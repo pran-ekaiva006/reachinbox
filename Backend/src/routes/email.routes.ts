@@ -1,10 +1,12 @@
 import { Router } from "express";
-import { prisma } from "../db";
-import { emailQueue } from "../queue/email.queue";
-
+import { prisma } from "../db.js";
+import { emailQueue } from "../queue/email.queue.js";
 
 const router = Router();
 
+/**
+ * POST /emails/schedule
+ */
 router.post("/schedule", async (req, res) => {
   try {
     const {
@@ -32,6 +34,14 @@ router.post("/schedule", async (req, res) => {
       return res.status(400).json({ error: "Invalid scheduledAt" });
     }
 
+    const existing = await prisma.email.findUnique({
+      where: { idempotencyKey },
+    });
+
+    if (existing) {
+      return res.json(existing);
+    }
+
     const email = await prisma.email.create({
       data: {
         userId,
@@ -45,19 +55,19 @@ router.post("/schedule", async (req, res) => {
       },
     });
 
-   const delay = date.getTime() - Date.now();
+    const delay = Math.max(0, date.getTime() - Date.now());
 
-await emailQueue.add(
-  "send-email",
-  { emailId: email.id },
-  {
-    attempts: 5,
-    backoff: { type: "exponential", delay: 5000 },
-    removeOnComplete: true,
-    removeOnFail: false,
-  }
-);
-
+    await emailQueue.add(
+      "send-email",
+      { emailId: email.id },
+      {
+        delay,
+        attempts: 5,
+        backoff: { type: "exponential", delay: 5000 },
+        removeOnComplete: true,
+        removeOnFail: false,
+      }
+    );
 
     return res.json(email);
   } catch (err) {
@@ -66,11 +76,10 @@ await emailQueue.add(
   }
 });
 
-// GET scheduled emails
 router.get("/scheduled", async (_req, res) => {
   try {
     const emails = await prisma.email.findMany({
-      where: { status: "scheduled" },
+      where: { status: { in: ["scheduled", "sending"] } },
       orderBy: { scheduledAt: "asc" },
     });
     res.json(emails);
@@ -80,7 +89,6 @@ router.get("/scheduled", async (_req, res) => {
   }
 });
 
-// GET sent emails
 router.get("/sent", async (_req, res) => {
   try {
     const emails = await prisma.email.findMany({
@@ -94,5 +102,14 @@ router.get("/sent", async (_req, res) => {
   }
 });
 
+router.get("/metrics", async (_req, res) => {
+  const [scheduled, sent, failed] = await Promise.all([
+    prisma.email.count({ where: { status: "scheduled" } }),
+    prisma.email.count({ where: { status: "sent" } }),
+    prisma.email.count({ where: { status: "failed" } }),
+  ]);
+
+  res.json({ scheduled, sent, failed });
+});
 
 export default router;

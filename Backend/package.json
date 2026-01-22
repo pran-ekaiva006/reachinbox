@@ -1,12 +1,11 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
-    "dev": "nodemon src/server.ts",
+    "dev": "nodemon",
     "build": "tsc",
-    "start": "node dist/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node dist/server.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -19,8 +18,9 @@
     "prisma": "^5.22.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.6",
-    "@types/node": "^25.0.9",
+    "@types/node": "^20.11.30",
     "nodemon": "^3.1.11",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
