@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
-import { api } from "../lib/api";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../api/client";
 
 type Email = {
   id: string;
   toEmail: string;
   subject: string;
   sentAt: string;
-  status: string;
+  status: "sent" | "failed";
 };
 
 export default function Sent() {
@@ -14,50 +14,88 @@ export default function Sent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = () => {
-      api
-        .get("/emails/sent")
-        .then(res => setEmails(res.data))
-        .catch(() => setError("Failed to load sent emails"))
-        .finally(() => setLoading(false));
-    };
+  const isMounted = useRef(true);
 
-    fetchData();
-    const id = setInterval(fetchData, 5000);
-    return () => clearInterval(id);
+  const fetchEmails = async (initial = false) => {
+    if (initial) setLoading(true);
+
+    try {
+      const res = await api.get<Email[]>("/emails/sent");
+      if (isMounted.current) {
+        setEmails(res.data);
+        setError(null);
+      }
+    } catch {
+      if (isMounted.current) {
+        setError("Failed to load sent emails");
+      }
+    } finally {
+      if (initial && isMounted.current) {
+        setLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchEmails(true);
+
+    const interval = setInterval(() => fetchEmails(false), 5000);
+
+    return () => {
+      isMounted.current = false;
+      clearInterval(interval);
+    };
   }, []);
 
-  if (loading) return <p>Loading sent emails…</p>;
-  if (error) return <p>{error}</p>;
+  if (loading) {
+    return <p className="text-gray-500">Loading sent emails…</p>;
+  }
+
+  if (error) {
+    return <p className="text-red-500">{error}</p>;
+  }
 
   return (
-    <div>
-      <h1>Sent Emails</h1>
+    <div className="space-y-4">
+      <h1 className="text-xl font-semibold">Sent Emails</h1>
 
       {emails.length === 0 ? (
-        <p>No sent emails</p>
+        <p className="text-gray-500">No sent emails</p>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>To</th>
-              <th>Subject</th>
-              <th>Sent At</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {emails.map(e => (
-              <tr key={e.id}>
-                <td>{e.toEmail}</td>
-                <td>{e.subject}</td>
-                <td>{new Date(e.sentAt).toLocaleString()}</td>
-                <td>{e.status}</td>
+        <div className="overflow-x-auto">
+          <table className="min-w-full border border-gray-200 text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 text-left">To</th>
+                <th className="px-3 py-2 text-left">Subject</th>
+                <th className="px-3 py-2 text-left">Sent At</th>
+                <th className="px-3 py-2 text-left">Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {emails.map(e => (
+                <tr key={e.id} className="border-t">
+                  <td className="px-3 py-2">{e.toEmail}</td>
+                  <td className="px-3 py-2">{e.subject}</td>
+                  <td className="px-3 py-2">
+                    {new Date(e.sentAt).toLocaleString()}
+                  </td>
+                  <td className="px-3 py-2 capitalize">
+                    <span
+                      className={
+                        e.status === "sent"
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }
+                    >
+                      {e.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

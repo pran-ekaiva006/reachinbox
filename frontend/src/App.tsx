@@ -1,16 +1,21 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
+import RequireAuth from "./auth/RequireAuth";
 import Dashboard from "./pages/Dashboard";
-import Scheduled from "./pages/Scheduled";
-import Sent from "./pages/Sent";
+import Login from "./pages/Login";
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/scheduled" element={<Scheduled />} />
-        <Route path="/sent" element={<Sent />} />
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+
+      <Route
+        path="/"
+        element={
+          <RequireAuth>
+            <Dashboard />
+          </RequireAuth>
+        }
+      />
+    </Routes>
   );
 }
