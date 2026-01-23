@@ -1,7 +1,6 @@
 {
   "watch": ["src"],
-  "ext": "ts",
-  "ignore": ["dist"],
-  "legacyWatch": true,
-  "exec": "node --loader ts-node/esm src/server.ts"
+  "ext": "ts,json",
+  "ignore": ["dist", "node_modules"],
+  "exec": "tsx src/server.ts"
 }

@@ -1,16 +1,19 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { emailQueue } from "../queue/email.queue.js";
+import { authenticate, AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
+
+// Apply authentication to all routes
+router.use(authenticate);
 
 /**
  * POST /emails/schedule
  */
-router.post("/schedule", async (req, res) => {
+router.post("/schedule", async (req: AuthRequest, res) => {
   try {
     const {
-      userId,
       senderId,
       toEmail,
       subject,
@@ -23,19 +26,60 @@ router.post("/schedule", async (req, res) => {
       return res.status(400).json({ error: "idempotencyKey required" });
     }
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return res.status(400).json({ error: "Invalid userId" });
+    // Get or create user
+    let user = await prisma.user.findUnique({
+      where: { email: req.userEmail! },
+    });
 
-    const sender = await prisma.sender.findUnique({ where: { id: senderId } });
-    if (!sender) return res.status(400).json({ error: "Invalid senderId" });
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          id: req.userId!,
+          email: req.userEmail!,
+        },
+      });
+    }
+
+    // If senderId provided, validate it belongs to user
+    let sender;
+    if (senderId) {
+      sender = await prisma.sender.findFirst({
+        where: {
+          id: senderId,
+          userId: user.id,
+        },
+      });
+
+      if (!sender) {
+        return res.status(400).json({ error: "Invalid senderId" });
+      }
+    } else {
+      // Create or get default sender for user
+      sender = await prisma.sender.findFirst({
+        where: { userId: user.id },
+      });
+
+      if (!sender) {
+        sender = await prisma.sender.create({
+          data: {
+            userId: user.id,
+            email: user.email,
+            name: user.name || user.email.split("@")[0],
+          },
+        });
+      }
+    }
 
     const date = new Date(scheduledAt);
     if (isNaN(date.getTime())) {
       return res.status(400).json({ error: "Invalid scheduledAt" });
     }
 
-    const existing = await prisma.email.findUnique({
-      where: { idempotencyKey },
+    const existing = await prisma.email.findFirst({
+      where: {
+        idempotencyKey,
+        userId: user.id,
+      },
     });
 
     if (existing) {
@@ -44,8 +88,8 @@ router.post("/schedule", async (req, res) => {
 
     const email = await prisma.email.create({
       data: {
-        userId,
-        senderId,
+        userId: user.id,
+        senderId: sender.id,
         toEmail,
         subject,
         body,
@@ -76,12 +120,24 @@ router.post("/schedule", async (req, res) => {
   }
 });
 
-router.get("/scheduled", async (_req, res) => {
+router.get("/scheduled", async (req: AuthRequest, res) => {
   try {
+    const user = await prisma.user.findUnique({
+      where: { email: req.userEmail! },
+    });
+
+    if (!user) {
+      return res.json([]);
+    }
+
     const emails = await prisma.email.findMany({
-      where: { status: { in: ["scheduled", "sending"] } },
+      where: {
+        userId: user.id,
+        status: { in: ["scheduled", "sending"] },
+      },
       orderBy: { scheduledAt: "asc" },
     });
+
     res.json(emails);
   } catch (err) {
     console.error(err);
@@ -89,12 +145,24 @@ router.get("/scheduled", async (_req, res) => {
   }
 });
 
-router.get("/sent", async (_req, res) => {
+router.get("/sent", async (req: AuthRequest, res) => {
   try {
+    const user = await prisma.user.findUnique({
+      where: { email: req.userEmail! },
+    });
+
+    if (!user) {
+      return res.json([]);
+    }
+
     const emails = await prisma.email.findMany({
-      where: { status: "sent" },
+      where: {
+        userId: user.id,
+        status: "sent",
+      },
       orderBy: { sentAt: "desc" },
     });
+
     res.json(emails);
   } catch (err) {
     console.error(err);
@@ -102,14 +170,27 @@ router.get("/sent", async (_req, res) => {
   }
 });
 
-router.get("/metrics", async (_req, res) => {
-  const [scheduled, sent, failed] = await Promise.all([
-    prisma.email.count({ where: { status: "scheduled" } }),
-    prisma.email.count({ where: { status: "sent" } }),
-    prisma.email.count({ where: { status: "failed" } }),
-  ]);
+router.get("/metrics", async (req: AuthRequest, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email: req.userEmail! },
+    });
 
-  res.json({ scheduled, sent, failed });
+    if (!user) {
+      return res.json({ scheduled: 0, sent: 0, failed: 0 });
+    }
+
+    const [scheduled, sent, failed] = await Promise.all([
+      prisma.email.count({ where: { userId: user.id, status: "scheduled" } }),
+      prisma.email.count({ where: { userId: user.id, status: "sent" } }),
+      prisma.email.count({ where: { userId: user.id, status: "failed" } }),
+    ]);
+
+    res.json({ scheduled, sent, failed });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch metrics" });
+  }
 });
 
 export default router;
