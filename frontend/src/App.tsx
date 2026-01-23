@@ -8,10 +8,8 @@ import RequireAuth from "./auth/RequireAuth";
 export default function App() {
   return (
     <Routes>
-      {/* PUBLIC ROUTE */}
       <Route path="/login" element={<Login />} />
 
-      {/* PROTECTED ROUTES */}
       <Route
         path="/"
         element={

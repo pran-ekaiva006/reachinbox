@@ -6,27 +6,28 @@ import {
   onAuthStateChanged,
   signOut,
 } from "firebase/auth";
-import type { User } from "firebase/auth";
 import { auth } from "../firebase";
 
-export type AuthContextType = {
-  user: User | null;
+type AuthContextValue = {
+  user: any;
   loading: boolean;
   login: () => void;
   logout: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getRedirectResult(auth).catch(() => {});
+    getRedirectResult(auth).catch(() => {
+      // ignore — handled by auth state listener
+    });
 
-    const unsub = onAuthStateChanged(auth, currentUser => {
-      setUser(currentUser);
+    const unsub = onAuthStateChanged(auth, u => {
+      setUser(u);
       setLoading(false);
     });
 
@@ -49,7 +50,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ✅ THIS WAS MISSING */
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) {
