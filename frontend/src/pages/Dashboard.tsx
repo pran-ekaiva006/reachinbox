@@ -3,43 +3,39 @@ import Header from "../components/Header";
 
 export default function Dashboard() {
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
-      {/* Navbar */}
+    <div className="min-h-screen bg-gray-50">
       <Header />
 
-      {/* Tabs */}
-      <div className="border-b bg-white px-6">
-        <nav className="flex gap-8">
+      <nav className="border-b bg-white px-8">
+        <div className="flex gap-8">
           <NavLink
-            to="/scheduled"
+            to="scheduled"
             className={({ isActive }) =>
-              `py-4 text-sm font-medium ${
+              `py-4 text-sm font-medium transition ${
                 isActive
-                  ? "border-b-2 border-black text-black"
-                  : "text-gray-500 hover:text-black"
+                  ? "border-b-2 border-indigo-600 text-indigo-600"
+                  : "text-gray-600 hover:text-gray-900"
               }`
             }
           >
             Scheduled
           </NavLink>
-
           <NavLink
-            to="/sent"
+            to="sent"
             className={({ isActive }) =>
-              `py-4 text-sm font-medium ${
+              `py-4 text-sm font-medium transition ${
                 isActive
-                  ? "border-b-2 border-black text-black"
-                  : "text-gray-500 hover:text-black"
+                  ? "border-b-2 border-indigo-600 text-indigo-600"
+                  : "text-gray-600 hover:text-gray-900"
               }`
             }
           >
             Sent
           </NavLink>
-        </nav>
-      </div>
+        </div>
+      </nav>
 
-      {/* Scrollable content */}
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="p-8">
         <Outlet />
       </main>
     </div>

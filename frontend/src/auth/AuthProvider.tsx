@@ -1,42 +1,32 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import {
-  GoogleAuthProvider,
-  signInWithRedirect,
-  getRedirectResult,
-  onAuthStateChanged,
-  signOut,
-} from "firebase/auth";
+import type { ReactNode } from "react";
+import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../firebase";
 
-type AuthContextValue = {
+type AuthContextType = {
   user: any;
   loading: boolean;
-  login: () => void;
+  login: () => Promise<void>;
   logout: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getRedirectResult(auth).catch(() => {
-      // ignore — handled by auth state listener
-    });
-
     const unsub = onAuthStateChanged(auth, u => {
       setUser(u);
       setLoading(false);
     });
-
     return unsub;
   }, []);
 
-  const login = () => {
+  const login = async () => {
     const provider = new GoogleAuthProvider();
-    signInWithRedirect(auth, provider);
+    await signInWithPopup(auth, provider);
   };
 
   const logout = async () => {

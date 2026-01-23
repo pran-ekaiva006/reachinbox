@@ -1,24 +1,19 @@
 import { Navigate } from "react-router-dom";
+import type { ReactNode } from "react";
 import { useAuth } from "./AuthProvider";
 
-export default function RequireAuth({
-  children,
-}: {
-  children: React.ReactElement;
-}) {
+type Props = {
+  children: ReactNode;
+};
+
+export default function RequireAuth({ children }: Props) {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center text-gray-500">
-        Checking authentication…
-      </div>
-    );
-  }
+  if (loading) return null;
 
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  return children;
+  return <>{children}</>;
 }
